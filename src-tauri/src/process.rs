@@ -40,6 +40,18 @@ pub fn kill_antigravity() -> Result<(), String> {
 }
 
 #[cfg(target_os = "windows")]
+pub fn hot_reload_language_server() -> Result<(), String> {
+    // 仅精准终止后台核心语言服务器，Electron 窗口保持存活并通过 Watchdog 自动毫秒级拉起新实例
+    let _ = Command::new("taskkill")
+        .args(["/F", "/IM", "language_server.exe", "/T"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output();
+
+    std::thread::sleep(std::time::Duration::from_millis(150));
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
 pub fn get_antigravity_exe_path() -> Option<PathBuf> {
     if let Some(local_app_data) = dirs::data_local_dir() {
         let p = local_app_data.join("Programs").join("antigravity").join("Antigravity.exe");
@@ -82,6 +94,13 @@ pub fn kill_antigravity() -> Result<(), String> {
     let _ = Command::new("killall").arg("Antigravity").output();
     let _ = Command::new("pkill").args(["-f", "language_server"]).output();
     std::thread::sleep(std::time::Duration::from_millis(300));
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+pub fn hot_reload_language_server() -> Result<(), String> {
+    let _ = Command::new("pkill").args(["-f", "language_server"]).output();
+    std::thread::sleep(std::time::Duration::from_millis(150));
     Ok(())
 }
 

@@ -7,12 +7,13 @@ import {
   Trash2,
   CheckCircle2,
   Power,
-  ShieldCheck,
   Zap,
   RefreshCcw,
   Globe,
   Loader2,
   DownloadCloud,
+  Check,
+  AlertCircle,
 } from "lucide-react";
 import "./App.css";
 
@@ -41,6 +42,7 @@ export default function App() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [showManualSnapshot, setShowManualSnapshot] = useState(false);
+  const [hotReload, setHotReload] = useState(true);
 
   const fetchState = async () => {
     try {
@@ -66,7 +68,7 @@ export default function App() {
     try {
       const alias = aliasInput.trim() || undefined;
       const account = await invoke<AccountItem>("start_google_login", { alias });
-      setSuccessMsg(`✅ 成功添加新账号：${account.email} (${account.name})`);
+      setSuccessMsg(`🎉 成功添加新账号：${account.email} (${account.name})`);
       setAliasInput("");
       await fetchState();
     } catch (err: any) {
@@ -93,13 +95,19 @@ export default function App() {
     }
   };
 
-  // 3. 一键切换账号
+  // 3. 一键切换账号（支持极速无感热切）
   const handleSwitch = async (id: string) => {
     setSwitchingId(id);
     setErrorMsg(null);
+    setSuccessMsg(null);
     try {
-      await invoke("switch_account", { id });
+      await invoke("switch_account", { id, hotReload });
       await fetchState();
+      if (hotReload && state?.is_antigravity_running) {
+        setSuccessMsg("⚡ 无感热切换成功！核心语言服务器已在后台带新凭据复活，桌面窗口无需重启。");
+      } else {
+        setSuccessMsg("✅ 账号切换成功！");
+      }
     } catch (err: any) {
       setErrorMsg("切换失败: " + String(err));
     } finally {
@@ -118,12 +126,29 @@ export default function App() {
     }
   };
 
-  // 5. 重启桌面端
+  // 5. 核心热重载
+  const handleHotReload = async () => {
+    setLoading(true);
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    try {
+      await invoke("hot_reload_antigravity");
+      await fetchState();
+      setSuccessMsg("⚡ 语言服务器核心大脑已重载复活！");
+    } catch (err: any) {
+      setErrorMsg("热重载失败: " + String(err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 6. 重启桌面端 (冷重启)
   const handleRestart = async () => {
     setLoading(true);
     try {
       await invoke("restart_antigravity");
       await fetchState();
+      setSuccessMsg("桌面端完整重启完成");
     } catch (err: any) {
       setErrorMsg("重启失败: " + String(err));
     } finally {
@@ -131,11 +156,12 @@ export default function App() {
     }
   };
 
-  // 6. 终止桌面端
+  // 7. 终止桌面端
   const handleKill = async () => {
     try {
       await invoke("kill_antigravity");
       await fetchState();
+      setSuccessMsg("反重力客户端所有进程已安全退出");
     } catch (err: any) {
       setErrorMsg("停止失败: " + String(err));
     }
@@ -151,7 +177,7 @@ export default function App() {
           </div>
           <div>
             <div className="brand-title">Antigravity 账号助手</div>
-            <div className="brand-subtitle">桌面端一键切换 · 内置独立授权</div>
+            <div className="brand-subtitle">秒级无感热切 · 独立 OAuth 授权</div>
           </div>
         </div>
 
@@ -167,44 +193,40 @@ export default function App() {
         </div>
       </header>
 
-      {/* 错误提示横幅 */}
+      {/* 消息提示栏 */}
       {errorMsg && (
-        <div style={{ background: "rgba(239, 68, 68, 0.2)", border: "1px solid rgba(239, 68, 68, 0.4)", borderRadius: 6, padding: "6px 10px", fontSize: 11, color: "#fca5a5" }}>
-          {errorMsg}
+        <div className="msg-box error">
+          <AlertCircle size={14} />
+          <span>{errorMsg}</span>
         </div>
       )}
-
-      {/* 成功提示横幅 */}
       {successMsg && (
-        <div style={{ background: "rgba(16, 185, 129, 0.2)", border: "1px solid rgba(16, 185, 129, 0.4)", borderRadius: 6, padding: "6px 10px", fontSize: 11, color: "#6ee7b7" }}>
-          {successMsg}
+        <div className="msg-box success">
+          <Check size={14} />
+          <span>{successMsg}</span>
         </div>
       )}
 
-      {/* 当前桌面端激活状态横幅 */}
+      {/* 当前桌面端激活的账号 */}
       <div className="active-banner">
         <div className="active-banner-header">
-          <span>当前客户端会话 (Active Session)</span>
-          <ShieldCheck size={14} />
+          <span>当前客户端会话凭据</span>
+          {state?.current_email && <span className="status-badge">有效授权</span>}
         </div>
         <div className="active-email">
-          {state?.current_email || "未检测到有效登录凭据"}
+          {state?.current_email || "（未检测到已登录的 Google 凭据）"}
         </div>
         <div className="active-meta">
-          <span>
-            Scope ID: {state?.current_user_scope ? state.current_user_scope.substring(0, 10) + "..." : "未知"}
-          </span>
-          <span>·</span>
-          <span>DPAPI 本地密保</span>
+          <span>Scope: {state?.current_user_scope || "默认"}</span>
         </div>
       </div>
 
-      {/* 核心登录与添加卡片 */}
+      {/* OAuth 独立登录区域 */}
       <div className="oauth-cta-card">
         {isAuthorizing ? (
           <div className="authorizing-box">
             <Loader2 size={16} className="spin" />
-            <span>已唤起浏览器，请在 Google 页面确认授权...</span>
+            <span>已在默认浏览器打开 Google 授权页面，请在网页中完成授权...</span>
           </div>
         ) : (
           <>
@@ -221,7 +243,7 @@ export default function App() {
               <input
                 type="text"
                 className="oauth-input"
-                placeholder="账号别名（选填，如：二号备用号）"
+                placeholder="账号别名（选填，如：备用号 / Team-2）"
                 value={aliasInput}
                 onChange={(e) => setAliasInput(e.target.value)}
                 disabled={isAuthorizing}
@@ -255,6 +277,25 @@ export default function App() {
         )}
       </div>
 
+      {/* 极速热切换控制栏 */}
+      <div className="mode-toggle-bar">
+        <label className="toggle-label" title="开启后仅热重载后台核心大脑，Electron 主窗口完全不关闭，秒级生效">
+          <input
+            type="checkbox"
+            checked={hotReload}
+            onChange={(e) => setHotReload(e.target.checked)}
+          />
+          <span className="toggle-switch-slider"></span>
+          <span className="toggle-text">
+            <Zap size={13} className="text-accent" />
+            <b>极速无感热切</b> (窗口不关，0.2秒切号)
+          </span>
+        </label>
+        <span className="mode-desc">
+          {hotReload ? "⚡ 仅重载后台 LS" : "🔄 完整冷重启客户端"}
+        </span>
+      </div>
+
       {/* 账号池列表 */}
       <div className="accounts-container">
         {state?.accounts && state.accounts.length > 0 ? (
@@ -280,15 +321,22 @@ export default function App() {
 
               <div className="account-actions">
                 <button
-                  className="btn-switch"
+                  className={`btn-switch ${hotReload ? "is-hot" : ""}`}
                   disabled={acc.is_active || switchingId === acc.id}
                   onClick={() => handleSwitch(acc.id)}
+                  title={hotReload ? "极速热切：不关闭主窗口" : "普通切换：重启桌面端"}
                 >
                   <RotateCw
                     size={13}
                     className={switchingId === acc.id ? "spin" : ""}
                   />
-                  <span>{acc.is_active ? "使用中" : "一键切换"}</span>
+                  <span>
+                    {acc.is_active
+                      ? "使用中"
+                      : hotReload
+                      ? "⚡ 极速热切"
+                      : "一键切换"}
+                  </span>
                 </button>
 
                 <button
@@ -315,13 +363,31 @@ export default function App() {
       {/* 底部控制与辅助操作 */}
       <footer className="app-footer">
         <div style={{ display: "flex", gap: 6 }}>
-          <button className="btn-ghost" onClick={handleRestart} disabled={loading} title="重启反重力桌面端">
-            <RefreshCcw size={12} />
-            <span>重启桌面端</span>
+          <button
+            className="btn-ghost"
+            onClick={handleHotReload}
+            disabled={loading}
+            title="仅重启后台语言服务器核心大脑，主窗口不关闭"
+          >
+            <Zap size={12} className="text-accent" />
+            <span>热重载核心</span>
           </button>
-          <button className="btn-ghost" onClick={handleKill} title="完全终止反重力进程">
+          <button
+            className="btn-ghost"
+            onClick={handleRestart}
+            disabled={loading}
+            title="完整重启反重力桌面端（冷重启）"
+          >
+            <RefreshCcw size={12} />
+            <span>冷重启</span>
+          </button>
+          <button
+            className="btn-ghost"
+            onClick={handleKill}
+            title="完全终止反重力所有进程"
+          >
             <Power size={12} />
-            <span>终止桌面端</span>
+            <span>终止</span>
           </button>
         </div>
 

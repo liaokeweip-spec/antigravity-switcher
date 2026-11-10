@@ -85,7 +85,6 @@ pub fn get_app_state() -> AppStateDto {
         .accounts
         .into_iter()
         .map(|mut acc| {
-            // 判断是否是当前激活
             let match_email = current_email.as_ref().map_or(false, |e| e == &acc.email);
             let match_scope = current_scope.as_ref().map_or(false, |s| s == &acc.user_scope);
             acc.is_active = match_email || match_scope;
@@ -103,7 +102,7 @@ pub fn get_app_state() -> AppStateDto {
 
 pub fn snapshot_current_account(name: String) -> Result<(), String> {
     let cred_json = read_credential(DEFAULT_TARGET)
-        .map_err(|_| "当前 Windows 凭据管理器中未找到有效的 Antigravity 登录凭据，请先在桌面端登录".to_string())?;
+        .map_err(|_| "当前系统凭据管理器中未找到有效的 Antigravity 登录凭据，请先在桌面端登录".to_string())?;
 
     let email = extract_email_from_cred(&cred_json)
         .unwrap_or_else(|| "unknown@gmail.com".to_string());
@@ -113,7 +112,6 @@ pub fn snapshot_current_account(name: String) -> Result<(), String> {
 
     let mut vault = load_vault();
 
-    // 检查是否已存在同 email 的账号，存在则更新，不存在则追加
     if let Some(existing) = vault.accounts.iter_mut().find(|a| a.email == email) {
         existing.name = name;
         existing.credential_blob = cred_json;
@@ -134,7 +132,7 @@ pub fn snapshot_current_account(name: String) -> Result<(), String> {
     save_vault(&vault)
 }
 
-pub fn switch_account(account_id: String) -> Result<(), String> {
+pub fn switch_account(account_id: String, hot_reload: bool) -> Result<(), String> {
     let vault = load_vault();
     let target_account = vault
         .accounts
@@ -142,20 +140,17 @@ pub fn switch_account(account_id: String) -> Result<(), String> {
         .find(|a| a.id == account_id)
         .ok_or_else(|| "未找到目标账号".to_string())?;
 
-    // 1. 杀死 Antigravity
-    let _ = crate::process::kill_antigravity();
-
-    // 2. 写入 Windows Credential
+    // 1. 写入系统凭据 (Windows Credential / macOS Keychain)
     write_credential(DEFAULT_TARGET, "antigravity", &target_account.credential_blob)?;
 
-    // 3. 写入 credential-user-scope
+    // 2. 写入 credential-user-scope
     if let Some(scope_path) = get_user_scope_path() {
         if !target_account.user_scope.is_empty() {
             let _ = fs::write(&scope_path, &target_account.user_scope);
         }
     }
 
-    // 4. 写入 ~/.gemini/google_accounts.json
+    // 3. 写入 ~/.gemini/google_accounts.json
     if let Some(accounts_path) = get_google_accounts_path() {
         if accounts_path.exists() {
             if let Ok(content) = fs::read_to_string(&accounts_path) {
@@ -172,8 +167,22 @@ pub fn switch_account(account_id: String) -> Result<(), String> {
         }
     }
 
-    // 5. 重新启动 Antigravity
-    crate::process::start_antigravity()
+    // 4. 判断 Antigravity 当前运行状态
+    let is_running = crate::process::is_antigravity_running();
+
+    if is_running {
+        if hot_reload {
+            // 极速无感热重载模式：仅终止后台语言服务器，外壳 Electron 窗口不关闭，看门狗自动拉起新实例加载新凭据
+            crate::process::hot_reload_language_server()
+        } else {
+            // 经典冷重启模式：完全杀死客户端外壳与语言服务器，并重新启动
+            crate::process::kill_antigravity()?;
+            crate::process::start_antigravity()
+        }
+    } else {
+        // 若客户端本来就未运行，写入凭据后启动客户端
+        crate::process::start_antigravity()
+    }
 }
 
 pub fn delete_account(account_id: String) -> Result<(), String> {

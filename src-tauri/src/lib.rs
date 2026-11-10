@@ -28,8 +28,8 @@ fn snapshot_current(name: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn switch_account(id: String) -> Result<(), String> {
-    store::switch_account(id)
+fn switch_account(id: String, hot_reload: Option<bool>) -> Result<(), String> {
+    store::switch_account(id, hot_reload.unwrap_or(true))
 }
 
 #[tauri::command]
@@ -40,6 +40,11 @@ fn delete_account(id: String) -> Result<(), String> {
 #[tauri::command]
 fn restart_antigravity() -> Result<(), String> {
     process::restart_antigravity()
+}
+
+#[tauri::command]
+fn hot_reload_antigravity() -> Result<(), String> {
+    process::hot_reload_language_server()
 }
 
 #[tauri::command]
@@ -55,8 +60,9 @@ pub fn run() {
             // 系统托盘菜单
             let quit_i = MenuItem::with_id(app, "quit", "退出助手", true, None::<&str>)?;
             let show_i = MenuItem::with_id(app, "show", "显示主窗口", true, None::<&str>)?;
-            let restart_i = MenuItem::with_id(app, "restart", "重启反重力桌面端", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_i, &restart_i, &quit_i])?;
+            let hot_reload_i = MenuItem::with_id(app, "hot_reload", "无感热重载核心", true, None::<&str>)?;
+            let restart_i = MenuItem::with_id(app, "restart", "完整重启反重力", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show_i, &hot_reload_i, &restart_i, &quit_i])?;
 
             let _tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
@@ -71,6 +77,9 @@ pub fn run() {
                             let _ = window.show();
                             let _ = window.set_focus();
                         }
+                    }
+                    "hot_reload" => {
+                        let _ = process::hot_reload_language_server();
                     }
                     "restart" => {
                         let _ = process::restart_antigravity();
@@ -102,6 +111,7 @@ pub fn run() {
             switch_account,
             delete_account,
             restart_antigravity,
+            hot_reload_antigravity,
             kill_antigravity
         ])
         .run(tauri::generate_context!())
