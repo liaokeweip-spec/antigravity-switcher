@@ -7,19 +7,11 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-tauri:
+  build-macos:
+    name: Build macOS (Apple Silicon M-Series)
+    runs-on: macos-latest
     permissions:
       contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: "windows-latest"
-            target: "x86_64-pc-windows-msvc"
-          - platform: "macos-14" # 苹果 M系列原生架构 (Apple Silicon aarch64)
-            target: "aarch64-apple-darwin"
-
-    runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -37,19 +29,63 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: aarch64-apple-darwin
 
       - name: Install frontend dependencies
         run: pnpm install
 
-      - name: Build Tauri App
+      - name: Build Tauri macOS App
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: v__VERSION__
           releaseName: "Antigravity Switcher v__VERSION__"
-          releaseBody: "自动编译发布的 Antigravity Switcher（支持 Windows 与 macOS M系列 Apple Silicon）"
+          releaseBody: "自动编译发布的 Antigravity Switcher（含 macOS Apple Silicon 与 Windows）"
           releaseDraft: false
           prerelease: false
-          args: --target ${{ matrix.target }}
+
+      - name: Upload DMG Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Antigravity-Switcher-macOS-DMG
+          path: src-tauri/target/release/bundle/dmg/*.dmg
+          if-no-files-found: ignore
+
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Install frontend dependencies
+        run: pnpm install
+
+      - name: Build Tauri Windows App
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseName: "Antigravity Switcher v__VERSION__"
+          releaseBody: "自动编译发布的 Antigravity Switcher（含 macOS Apple Silicon 与 Windows）"
+          releaseDraft: false
+          prerelease: false
