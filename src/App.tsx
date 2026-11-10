@@ -33,6 +33,63 @@ interface AppState {
   accounts: AccountItem[];
 }
 
+function AntigravityLogo({ size = 22 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 1024 1024"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      style={{ display: "block" }}
+    >
+      <defs>
+        <linearGradient id="uiAGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#ffffff" />
+          <stop offset="25%" stopColor="#38bdf8" />
+          <stop offset="70%" stopColor="#0284c7" />
+          <stop offset="100%" stopColor="#1e40af" />
+        </linearGradient>
+        <linearGradient id="uiRingBack" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#0284c7" stopOpacity="0.4" />
+          <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.6" />
+        </linearGradient>
+        <linearGradient id="uiRingFront" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor="#0284c7" />
+          <stop offset="40%" stopColor="#38bdf8" />
+          <stop offset="60%" stopColor="#ffffff" />
+          <stop offset="100%" stopColor="#0284c7" />
+        </linearGradient>
+      </defs>
+      {/* 45° 倾斜椭圆环（后半段） */}
+      <g transform="translate(512, 530) rotate(-45)">
+        <path
+          d="M -410,0 A 410,140 0 0,1 410,0"
+          stroke="url(#uiRingBack)"
+          strokeWidth="60"
+          strokeLinecap="round"
+        />
+      </g>
+      {/* 字母 A 主体 */}
+      <path
+        d="M 480,210 L 544,210 L 740,750 L 630,750 L 582,610 L 442,610 L 394,750 L 284,750 Z M 464,530 L 560,530 L 512,380 Z"
+        fill="url(#uiAGrad)"
+        fillRule="evenodd"
+      />
+      {/* 45° 倾斜椭圆环（前半段包裹） */}
+      <g transform="translate(512, 530) rotate(-45)">
+        <path
+          d="M 410,0 A 410,140 0 0,1 -410,0"
+          stroke="url(#uiRingFront)"
+          strokeWidth="64"
+          strokeLinecap="round"
+        />
+        <circle cx="120" cy="136" r="22" fill="#ffffff" />
+      </g>
+    </svg>
+  );
+}
+
 export default function App() {
   const [state, setState] = useState<AppState | null>(null);
   const [loading, setLoading] = useState(false);
@@ -173,11 +230,11 @@ export default function App() {
       <header className="app-header">
         <div className="brand-wrapper">
           <div className="brand-icon">
-            <Zap size={18} />
+            <AntigravityLogo size={24} />
           </div>
           <div>
             <div className="brand-title">Antigravity 账号助手</div>
-            <div className="brand-subtitle">秒级无感热切 · 独立 OAuth 授权</div>
+            <div className="brand-subtitle">秒级无感热切 · 托盘常驻</div>
           </div>
         </div>
 
@@ -285,7 +342,6 @@ export default function App() {
             checked={hotReload}
             onChange={(e) => setHotReload(e.target.checked)}
           />
-          <span className="toggle-switch-slider"></span>
           <span className="toggle-text">
             <Zap size={13} className="text-accent" />
             <b>极速无感热切</b> (窗口不关，0.2秒切号)
@@ -391,8 +447,8 @@ export default function App() {
           </button>
         </div>
 
-        <div>
-          <span>独立 Loopback 授权 · 秒级热切</span>
+        <div style={{ fontSize: 10, opacity: 0.7 }}>
+          <span>点击右上角 ✖ 自动最小化至托盘</span>
         </div>
       </footer>
     </div>
