@@ -31,6 +31,13 @@ interface AppState {
   current_user_scope: string | null;
   is_antigravity_running: boolean;
   accounts: AccountItem[];
+  consecutive_hot_reloads: number;
+  max_safe_hot_reloads: number;
+}
+
+interface SwitchResult {
+  mode: string;
+  message: string;
 }
 
 function AntigravityLogo({ size = 22 }: { size?: number }) {
@@ -152,19 +159,15 @@ export default function App() {
     }
   };
 
-  // 3. 一键切换账号（支持极速无感热切）
+  // 3. 一键切换账号（支持极速无感热切 + 看门狗防熔断降级保护）
   const handleSwitch = async (id: string) => {
     setSwitchingId(id);
     setErrorMsg(null);
     setSuccessMsg(null);
     try {
-      await invoke("switch_account", { id, hotReload });
+      const result = await invoke<SwitchResult>("switch_account", { id, hotReload });
       await fetchState();
-      if (hotReload && state?.is_antigravity_running) {
-        setSuccessMsg("⚡ 无感热切换成功！核心语言服务器已在后台带新凭据复活，桌面窗口无需重启。");
-      } else {
-        setSuccessMsg("✅ 账号切换成功！");
-      }
+      setSuccessMsg(result.message);
     } catch (err: any) {
       setErrorMsg("切换失败: " + String(err));
     } finally {
@@ -336,7 +339,7 @@ export default function App() {
 
       {/* 极速热切换控制栏 */}
       <div className="mode-toggle-bar">
-        <label className="toggle-label" title="开启后仅热重载后台核心大脑，Electron 主窗口完全不关闭，秒级生效">
+        <label className="toggle-label" title="开启后仅热重载后台核心大脑，Electron 主窗口完全不关闭；连续切号达上限时会自动改用安全冷重启防熔断">
           <input
             type="checkbox"
             checked={hotReload}
@@ -344,11 +347,17 @@ export default function App() {
           />
           <span className="toggle-text">
             <Zap size={13} className="text-accent" />
-            <b>极速无感热切</b> (窗口不关，0.2秒切号)
+            <b>极速无感热切</b> (窗口不关，约2秒重连)
           </span>
         </label>
         <span className="mode-desc">
-          {hotReload ? "⚡ 仅重载后台 LS" : "🔄 完整冷重启客户端"}
+          {!hotReload
+            ? "🔄 完整冷重启客户端"
+            : state && state.consecutive_hot_reloads >= state.max_safe_hot_reloads
+            ? "🛡️ 下次自动防熔断冷重启"
+            : state && state.consecutive_hot_reloads > 0
+            ? `⚡ 连续热切 ${state.consecutive_hot_reloads}/${state.max_safe_hot_reloads}`
+            : "⚡ 仅重载后台 LS"}
         </span>
       </div>
 

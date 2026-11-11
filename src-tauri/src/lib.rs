@@ -5,7 +5,7 @@ mod oauth;
 mod process;
 mod store;
 
-use models::{AccountItem, AppStateDto};
+use models::{AccountItem, AppStateDto, SwitchResultDto};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
@@ -28,7 +28,7 @@ fn snapshot_current(name: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn switch_account(id: String, hot_reload: Option<bool>) -> Result<(), String> {
+fn switch_account(id: String, hot_reload: Option<bool>) -> Result<SwitchResultDto, String> {
     store::switch_account(id, hot_reload.unwrap_or(true))
 }
 
